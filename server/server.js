@@ -73,17 +73,19 @@ wss.on('connection', (ws) => {
     });
 
     ws.on('close', () => {
-        // end game, tell other client if connected
-        //connections = connections.filter(connection => connection !== ws);
-        console.log('Connection closed. Total:', connections.size);
-        if(lobby != -1){
-            // TODO
-            // connected to a game lobby, close the lobby for all players.
-            console.log("closing game lobby");
-            // get other ws listed in list that isn't this ws
-            // put them in init state
-            // send message that other player is disconnected and they are now in init state.
+        if(connections.get(ws)[1] != -1){
+            lobby = connections.get(ws)[1];
+            console.log("closing lobby", lobby);
+            games[lobby].forEach(function each(client) {
+                if (client != ws && client.readyState === WebSocket.OPEN) {
+                    connections.set(client, ["init", -1]);
+                    client.send(JSON.stringify("disconnected return to menu"));
+                    delete games[lobby];
+                }
+            });
         }
+        connections.delete(ws);
+        console.log('Connection closed. Total:', connections.size);
     });
 });
 
