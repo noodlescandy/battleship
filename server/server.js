@@ -3,47 +3,56 @@ const WebSocket = require('ws');
 const portNo = 9576;
 const wss = new WebSocket.Server({ port: portNo });
 
-connections = [];
+connections = new Map();
 games = {}; // dict with game codes as key and list of players as value
 
 wss.on('connection', (ws) => {
-    // inital connection
-    connections.push(ws);
-    console.log('Client connected. Total:', connections.length);
-    state = "init";
-    lobby = -1;
+    // inital connection, set connection vars
+    connections.set(ws, ["init", -1]);
+    console.log('Client connected. Total:', connections.size);
+    //lobby = -1;
     
     // handle messages and states
     ws.on('message', (message) => {
-        messageData = JSON.parse(message)
+        messageData = JSON.parse(message);
         console.log(messageData); // debug to test message content
-        switch(state) {
+        switch(connections.get(ws)[0]) {
             case "init": // server setup state (not in lobby)
                 // based on message, should be about either starting a game or joining a game
                 if (messageData === "start"){
-                    if (lobby != -1){ // already in lobby
+                    if (connections.get(ws)[1] != -1){ // already in lobby, resend game code
                         ws.send(JSON.stringify(lobby.toString()));
                         break;
                     }
+                    lobby = -1;
                     do {
                         lobby = Math.floor(Math.random() * 10000);
-                    } while (lobby in games)
+                    } while (lobby in games);
+                    connections.set(ws, [connections.get(ws)[0], lobby]);
                     games[lobby] = [ws];
-                    console.log("New Game", lobby, "created.")
+                    console.log("New Game", lobby, "created.");
                     ws.send(JSON.stringify(lobby.toString()));
                 }
                 else{
                     content = messageData.split(" ");
                     if (content[0] === "join"){
-                        code = content[1];
-                        // TODO
-                        // check for code in games
-                        // if code not found, return error
-                        ws.send(JSON.stringify("Error: code not found"));
-                        // if code found
-                            // add client as value to list in dict
-                            // move both clients to setup state
-                            // send message to both clients to begin setup.
+                        code = parseInt(content[1], 10);
+                        if (!(code in games)){
+                            ws.send(JSON.stringify("Error: code not found, use start to create game"));
+                            break;
+                        }
+                        if (games[code].length >= 2){
+                            ws.send(JSON.stringify("Error: game full"));
+                            break;
+                        }
+                        connections.set(ws, [connections.get(ws)[0], code]);
+                        games[code][1] = ws;
+                        games[code].forEach(function each(client) {
+                            if (client.readyState === WebSocket.OPEN) {
+                                connections.set(client, ["setup", connections.get(ws)[1]]);
+                                client.send(JSON.stringify("ready for game setup"));
+                            }
+                        });
                     }
                     else{
                         // unrecognized command
@@ -65,8 +74,8 @@ wss.on('connection', (ws) => {
 
     ws.on('close', () => {
         // end game, tell other client if connected
-        connections = connections.filter(connection => connection !== ws);
-        console.log('Connection closed. Total:', connections.length);
+        //connections = connections.filter(connection => connection !== ws);
+        console.log('Connection closed. Total:', connections.size);
         if(lobby != -1){
             // TODO
             // connected to a game lobby, close the lobby for all players.
