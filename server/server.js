@@ -31,7 +31,7 @@ function validateBoard(board){
 
 wss.on('connection', (ws) => {
     // inital connection, set connection vars
-    connections.set(ws, ["init", -1]);
+    connections.set(ws, ["init", -1, undefined]);
     console.log('Client connected. Total:', connections.size);
     //lobby = -1;
     
@@ -51,7 +51,7 @@ wss.on('connection', (ws) => {
                     do {
                         lobby = Math.floor(Math.random() * 10000);
                     } while (lobby in games);
-                    connections.set(ws, [connections.get(ws)[0], lobby]);
+                    connections.set(ws, [connections.get(ws)[0], lobby, undefined]);
                     games[lobby] = [ws];
                     console.log("New Game", lobby, "created.");
                     ws.send(JSON.stringify(lobby.toString()));
@@ -68,11 +68,11 @@ wss.on('connection', (ws) => {
                             ws.send(JSON.stringify("Error: game full"));
                             break;
                         }
-                        connections.set(ws, [connections.get(ws)[0], code]);
+                        connections.set(ws, [connections.get(ws)[0], code, undefined]);
                         games[code][1] = ws;
                         games[code].forEach(function each(client) {
                             if (client.readyState === WebSocket.OPEN) {
-                                connections.set(client, ["placing", connections.get(ws)[1]]);
+                                connections.set(client, ["placing", connections.get(ws)[1], undefined]);
                                 client.send(JSON.stringify("ready for game setup"));
                             }
                         });
@@ -92,22 +92,54 @@ wss.on('connection', (ws) => {
                 // assumes messageData is array
                 //board = messageData;
                 flag = validateBoard(messageData);
-                if (flag != "ok"){
-                    ws.send(JSON.stringify(flag));
-                    break;
+                if (ws.readyState === WebSocket.OPEN){
+                    if (flag != "ok"){
+                        ws.send(JSON.stringify(flag));
+                        break;
+                    }
+                    ws.send(JSON.stringify("valid board"));
                 }
-                ws.send(JSON.stringify("valid board"));
-                // check if other client has done theirs yet. If they have, return ok for next state and move both to next state. 
-                
+                // check if other client has done theirs yet. If they have, start game and decide turns. 
+                connections.set(ws, ["wait", connections.get(ws)[1], messageData]);
+                games[code].forEach(function each(client){
+                    // game start
+                    if (ws != client && connections.get(client)[0] === "wait"){
+                        turn = Math.round(Math.random()); // 0 or 1
+                        if (client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify("game start"));
+                        }
+                        if (ws.readyState === WebSocket.OPEN) {
+                            ws.send(JSON.stringify("game start"));
+                        }
+                        if (turn){
+                            connections.set(client, ['turn', connections.get(client)[1], connections.get(client)[2]]);
+                            if (client.readyState === WebSocket.OPEN) {
+                                client.send(JSON.stringify("your turn"));
+                            }
+                            if (ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify("waiting for other player"));
+                            }
+                        }
+                        else{
+                            connections.set(ws, ['turn', connections.get(ws)[1], connections.get(ws)[2]]);
+                            if (ws.readyState === WebSocket.OPEN) {
+                                ws.send(JSON.stringify("your turn"));
+                            }
+                            if (client.readyState === WebSocket.OPEN) {
+                                client.send(JSON.stringify("waiting for other player"));
+                            }
+                        }
+                    }
+                });
                 break;
-            // TODO - other states -- gameTurn, wait (turns)
+            // TODO - other states -- turn
             case 'wait':
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify("Please wait for other client."));
                 }
+                break;
             default:
                 // unknown state/ not implemented
-                // wait state goes here.
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify("Error: Message not recognized/implemented. Try again later."));
                 }
