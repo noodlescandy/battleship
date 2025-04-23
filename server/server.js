@@ -6,6 +6,29 @@ const wss = new WebSocket.Server({ port: portNo });
 connections = new Map();
 games = {}; // dict with game codes as key and list of players as value
 
+// checks board given and returns true if OK and false if not a valid board
+function validateBoard(board){
+    if (board.length != 10){
+        return "bad length";
+    }
+    // validate number of ship tiles on board (5,4,3,3,2=17)
+    countShipTiles = 0;
+    for(var i = 0; i < board.length; i++){
+        if (board[i].length != 10){
+            return "bad row length " + board[i].length;
+        }
+        for(var j = 0; j < board[i].length; j++){
+            if(board[i][j]){
+                countShipTiles++;
+            }
+        }
+    }
+    if(countShipTiles != 17){
+        return "bad ship count " + countShipTiles;
+    }
+    return "ok";
+}
+
 wss.on('connection', (ws) => {
     // inital connection, set connection vars
     connections.set(ws, ["init", -1]);
@@ -49,7 +72,7 @@ wss.on('connection', (ws) => {
                         games[code][1] = ws;
                         games[code].forEach(function each(client) {
                             if (client.readyState === WebSocket.OPEN) {
-                                connections.set(client, ["setup", connections.get(ws)[1]]);
+                                connections.set(client, ["placing", connections.get(ws)[1]]);
                                 client.send(JSON.stringify("ready for game setup"));
                             }
                         });
@@ -62,9 +85,29 @@ wss.on('connection', (ws) => {
                     }
                 }
                 break;
-            // TODO - other states -- setup (ship placement), gameTurn, gameWait (turns)
+            // one or both clients are in placing mode. They send the boards to the server when it is completed. The server tells both clients on game start
+            case 'placing':
+                // structure of board expected -- 2D Array 10x10 with 0s and 1s for ships.
+                // receive board (messageData)
+                // assumes messageData is array
+                //board = messageData;
+                flag = validateBoard(messageData);
+                if (flag != "ok"){
+                    ws.send(JSON.stringify(flag));
+                    break;
+                }
+                ws.send(JSON.stringify("valid board"));
+                // check if other client has done theirs yet. If they have, return ok for next state and move both to next state. 
+                
+                break;
+            // TODO - other states -- gameTurn, wait (turns)
+            case 'wait':
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify("Please wait for other client."));
+                }
             default:
                 // unknown state/ not implemented
+                // wait state goes here.
                 if (ws.readyState === WebSocket.OPEN) {
                     ws.send(JSON.stringify("Error: Message not recognized/implemented. Try again later."));
                 }
