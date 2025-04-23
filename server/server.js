@@ -6,11 +6,43 @@ const wss = new WebSocket.Server({ port: portNo });
 connections = new Map();
 games = {}; // dict with game codes as key and list of players as value
 
+// checks board given and returns true if OK and false if not a valid board
+function validateBoard(board){
+    if (!(Array.isArray(board))){
+        return "not an array";
+    }
+    if (board.length != 10){
+        return "bad length";
+    }
+    // validate number of ship tiles on board (5,4,3,3,2=17)
+    countShipTiles = 0;
+    for(var i = 0; i < board.length; i++){
+        if (board[i].length != 10){
+            return "bad row length " + board[i].length;
+        }
+        for(var j = 0; j < board[i].length; j++){
+            if(board[i][j]){
+                countShipTiles++;
+            }
+        }
+    }
+    if(countShipTiles != 17){
+        return "bad ship count " + countShipTiles;
+    }
+    return "ok";
+}
+
+// sends the text to the websocket if it is open
+function sendMsg(ws, text){
+    if (ws.readyState = WebSocket.OPEN){
+        ws.send(JSON.stringify(text));
+    }
+}
+
 wss.on('connection', (ws) => {
     // inital connection, set connection vars
-    connections.set(ws, ["init", -1]);
+    connections.set(ws, ["init", -1, undefined]);
     console.log('Client connected. Total:', connections.size);
-    //lobby = -1;
     
     // handle messages and states
     ws.on('message', (message) => {
@@ -21,53 +53,78 @@ wss.on('connection', (ws) => {
                 // based on message, should be about either starting a game or joining a game
                 if (messageData === "start"){
                     if (connections.get(ws)[1] != -1){ // already in lobby, resend game code
-                        ws.send(JSON.stringify(lobby.toString()));
+                        sendMsg(ws, lobby.toString());
                         break;
                     }
                     lobby = -1;
                     do {
                         lobby = Math.floor(Math.random() * 10000);
                     } while (lobby in games);
-                    connections.set(ws, [connections.get(ws)[0], lobby]);
+                    connections.set(ws, [connections.get(ws)[0], lobby, undefined]);
                     games[lobby] = [ws];
                     console.log("New Game", lobby, "created.");
-                    ws.send(JSON.stringify(lobby.toString()));
+                    sendMsg(ws, lobby.toString());
                 }
                 else{
                     content = messageData.split(" ");
                     if (content[0] === "join"){
                         code = parseInt(content[1], 10);
                         if (!(code in games)){
-                            ws.send(JSON.stringify("Error: code not found, use start to create game"));
+                            sendMsg(ws, "Error: code not found, use start to create game");
                             break;
                         }
                         if (games[code].length >= 2){
-                            ws.send(JSON.stringify("Error: game full"));
+                            sendMsg(ws, "Error: game full");
                             break;
                         }
-                        connections.set(ws, [connections.get(ws)[0], code]);
+                        connections.set(ws, [connections.get(ws)[0], code, undefined]);
                         games[code][1] = ws;
                         games[code].forEach(function each(client) {
-                            if (client.readyState === WebSocket.OPEN) {
-                                connections.set(client, ["setup", connections.get(ws)[1]]);
-                                client.send(JSON.stringify("ready for game setup"));
-                            }
+                            connections.set(client, ["placing", connections.get(ws)[1], undefined]);
+                            sendMsg(client, "ready for game setup");
                         });
                     }
                     else{
                         // unrecognized command
-                        if (ws.readyState === WebSocket.OPEN) {
-                            ws.send(JSON.stringify("Error: invalid command for current init state. Valid commands are start and join <code>"));
-                        }
+                        sendMsg(ws, "Error: invalid command for current init state. Valid commands are start and join <code>");
                     }
                 }
                 break;
-            // TODO - other states -- setup (ship placement), gameTurn, gameWait (turns)
+            case 'placing':
+                // structure of board expected -- 2D Array 10x10 with 0s and 1s for ships.
+                flag = validateBoard(messageData);
+                if (flag != "ok"){
+                    sendMsg(ws, flag);
+                    break;
+                }
+                sendMsg(ws, "valid board");
+                // check if other client has submitted theirs yet. If they have, start game and decide turns. 
+                connections.set(ws, ["wait", connections.get(ws)[1], messageData]);
+                games[code].forEach(function each(client){
+                    if (ws != client && connections.get(client)[0] === "wait"){
+                        turn = Math.round(Math.random()); // 0 or 1
+                        sendMsg(client, "game start");
+                        sendMsg(ws, "game start");
+                        if (turn){
+                            connections.set(client, ['turn', connections.get(client)[1], connections.get(client)[2]]);
+                            sendMsg(client, "your turn");
+                            sendMsg(ws, "waiting for other player");
+                        }
+                        else{
+                            connections.set(ws, ['turn', connections.get(ws)[1], connections.get(ws)[2]]);
+                            sendMsg(ws, "your turn");
+                            sendMsg(client, "waiting for other player");
+                        }
+                    }
+                });
+                break;
+            // TODO - other states -- turn
+            case 'wait':
+                sendMsg(ws, "Please wait for other client.");
+                break;
             default:
                 // unknown state/ not implemented
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify("Error: Message not recognized/implemented. Try again later."));
-                }
+                sendMsg(ws, "Error: Message not recognized/implemented. Try again later.");
                 break;
         }
     });
@@ -77,9 +134,9 @@ wss.on('connection', (ws) => {
             lobby = connections.get(ws)[1];
             console.log("closing lobby", lobby);
             games[lobby].forEach(function each(client) {
-                if (client != ws && client.readyState === WebSocket.OPEN) {
+                if (client != ws) {
                     connections.set(client, ["init", -1]);
-                    client.send(JSON.stringify("disconnected return to menu"));
+                    sendMsg(client, "disconnected return to menu");
                     delete games[lobby];
                 }
             });
