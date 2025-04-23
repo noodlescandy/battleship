@@ -8,6 +8,9 @@ games = {}; // dict with game codes as key and list of players as value
 
 // checks board given and returns true if OK and false if not a valid board
 function validateBoard(board){
+    if (!(Array.isArray(board))){
+        return "not an array";
+    }
     if (board.length != 10){
         return "bad length";
     }
@@ -40,7 +43,6 @@ wss.on('connection', (ws) => {
     // inital connection, set connection vars
     connections.set(ws, ["init", -1, undefined]);
     console.log('Client connected. Total:', connections.size);
-    //lobby = -1;
     
     // handle messages and states
     ws.on('message', (message) => {
@@ -88,22 +90,17 @@ wss.on('connection', (ws) => {
                     }
                 }
                 break;
-            // one or both clients are in placing mode. They send the boards to the server when it is completed. The server tells both clients on game start
             case 'placing':
                 // structure of board expected -- 2D Array 10x10 with 0s and 1s for ships.
-                // receive board (messageData)
-                // assumes messageData is array
-                //board = messageData;
                 flag = validateBoard(messageData);
                 if (flag != "ok"){
                     sendMsg(ws, flag);
                     break;
                 }
                 sendMsg(ws, "valid board");
-                // check if other client has done theirs yet. If they have, start game and decide turns. 
+                // check if other client has submitted theirs yet. If they have, start game and decide turns. 
                 connections.set(ws, ["wait", connections.get(ws)[1], messageData]);
                 games[code].forEach(function each(client){
-                    // game start
                     if (ws != client && connections.get(client)[0] === "wait"){
                         turn = Math.round(Math.random()); // 0 or 1
                         sendMsg(client, "game start");
