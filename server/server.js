@@ -15,14 +15,18 @@ function validateBoard(board){
         return "bad length";
     }
     // validate number of ship tiles on board (5,4,3,3,2=17)
-    countShipTiles = 0;  
+    countShipTiles = 0;
+    foundCarrier = false;
     for(var i = 0; i < board.length; i++){
         if (board[i].length != 10){
             return "bad row length " + board[i].length;
         }
+        maxContinuousShipTiles = 0;
+        continuousShipTiles = 0;
         for(var j = 0; j < board[i].length; j++){
             if(board[i][j]){
                 countShipTiles++;
+                continuousShipTiles++;
                 adjacents = 0;
                 if (i != 0){
                     if (board[i-1][j] === 1) adjacents++;
@@ -39,7 +43,21 @@ function validateBoard(board){
                 if (adjacents > 2){
                     return "ships cannot be adjacent";
                 }
+                if (adjacents === 0){
+                    return "invalid ship detected. Ships cannot be size 1";
+                }
             }
+            else{
+                if(maxContinuousShipTiles < continuousShipTiles) maxContinuousShipTiles = continuousShipTiles;
+                continuousShipTiles = 0;
+            }
+        }
+        if(maxContinuousShipTiles < continuousShipTiles) maxContinuousShipTiles = continuousShipTiles;
+        if (maxContinuousShipTiles > 5 || (foundCarrier && maxContinuousShipTiles === 5)){
+            return "ships cannot be adjacent horizontally.";
+        }
+        if (maxContinuousShipTiles === 5){
+            foundCarrier = true;
         }
     }
     if(countShipTiles != 17){
@@ -48,6 +66,28 @@ function validateBoard(board){
     // Check corners for adjacency
     if ((board[0][0] === 1 && board[0][1] === 1 && board[1][0] === 1) || (board[9][9] === 1 & board[8][9] === 1 && board[9][8] === 1)){
         return "ships cannot be adjacent";
+    }
+    // check up/down for continuous tiles
+    // has to happen seperately so it doesn't miss any while counting horizontals.
+    for(var i = 0; i < board.length; i++){
+        maxContinuousShipTiles = 0;
+        continuousShipTiles = 0;
+        for(var j = 0; j < board.length; j++){
+            if (board[j][i] === 1){
+                continuousShipTiles++;
+            }
+            else{
+                if(maxContinuousShipTiles < continuousShipTiles) maxContinuousShipTiles = continuousShipTiles;
+                continuousShipTiles = 0;
+            }
+        }
+        if(maxContinuousShipTiles < continuousShipTiles) maxContinuousShipTiles = continuousShipTiles;
+        if (maxContinuousShipTiles > 5 || (foundCarrier && maxContinuousShipTiles === 5)){
+            return "ships cannot be adjacent vertically.";
+        }
+        if (maxContinuousShipTiles === 5){
+            foundCarrier = true;
+        }
     }
     return "ok";
 }
@@ -170,6 +210,8 @@ wss.on('connection', (ws) => {
                 if (board[y][x] === 3){
                     sendMsg(ws, "hit (go again)");
                     // check if ship was sunk.
+                    // ships will not have any adjacent ships, so are either straight vert or horizontal. The
+
                     // if ship sunk, broadcast that it was
                     // if no ships left, game is over.
                     break;
