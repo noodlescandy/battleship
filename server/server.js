@@ -15,7 +15,7 @@ function validateBoard(board){
         return "bad length";
     }
     // validate number of ship tiles on board (5,4,3,3,2=17)
-    countShipTiles = 0;
+    countShipTiles = 0;  
     for(var i = 0; i < board.length; i++){
         if (board[i].length != 10){
             return "bad row length " + board[i].length;
@@ -23,11 +23,31 @@ function validateBoard(board){
         for(var j = 0; j < board[i].length; j++){
             if(board[i][j]){
                 countShipTiles++;
+                adjacents = 0;
+                if (i != 0){
+                    if (board[i-1][j] === 1) adjacents++;
+                }
+                if (j != 0){
+                    if (board[i][j-1] === 1) adjacents++;
+                }
+                if (i < 9){
+                    if (board[i+1][j] === 1) adjacents++;
+                }
+                if (j < 9){
+                    if (board[i][j+1] === 1) adjacents++;
+                }
+                if (adjacents > 2){
+                    return "ships cannot be adjacent";
+                }
             }
         }
     }
     if(countShipTiles != 17){
         return "bad ship count " + countShipTiles;
+    }
+    // Check corners for adjacency
+    if ((board[0][0] === 1 && board[0][1] === 1 && board[1][0] === 1) || (board[9][9] === 1 & board[8][9] === 1 && board[9][8] === 1)){
+        return "ships cannot be adjacent";
     }
     return "ok";
 }
