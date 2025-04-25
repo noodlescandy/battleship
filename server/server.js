@@ -134,9 +134,14 @@ wss.on('connection', (ws) => {
                     sendMsg(ws, "Error: " + error + ".  Format: 0-9 0-9 for y, x on board.");
                     break;
                 }
-                // if already hit
-                // changing board here changes it there bc it's a reference to the object.
-                board = connections.get(ws)[2];
+                opposingPlayer = undefined;
+                games[code].forEach(function each(client){
+                    if (ws != client){
+                        opposingPlayer = client;
+                    }
+                });
+                // changing board here should change it there bc it's a reference to the object.
+                board = connections.get(opposingPlayer)[2];
                 if(board[y][x] > 1){
                     sendMsg(ws, "Error: already shot here!");
                     break;
@@ -146,12 +151,15 @@ wss.on('connection', (ws) => {
                     sendMsg(ws, "hit (go again)");
                     // check if ship was sunk.
                     // if ship sunk, broadcast that it was
+                    // if no ships left, game is over.
                     break;
                 }
                 sendMsg(ws, "miss");
-                // set turn to other player
-                // send them their board since it's changed
-                // set ws to wait state
+                sendMsg(ws, "waiting for other player");
+                connections.set(ws, ['wait', connections.get(ws)[1], connections.get(ws)[2]]);
+                sendMsg(opposingPlayer, board);
+                sendMsg(opposingPlayer, "your turn");
+                connections.set(opposingPlayer, ['turn', connections.get(opposingPlayer)[1], connections.get(opposingPlayer)[2]]);
                 break;
             case 'wait':
                 sendMsg(ws, "Please wait for other client.");
