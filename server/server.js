@@ -122,6 +122,14 @@ function checkIfSunk(board, y, x){
     return true; // no unhit tiles, only ocean or hit ocean surrounding hit tiles
 }
 
+// checks the board for any 1s, which indicate an unhit ship tile
+function shipsLeft(board){
+    for (var i = 0; i < board.length; i++){
+        if (board[i].includes(1)) return true;
+    }
+    return false;
+}
+
 // sends the text to the websocket if it is open
 function sendMsg(ws, text){
     if (ws.readyState = WebSocket.OPEN){
@@ -243,9 +251,15 @@ wss.on('connection', (ws) => {
                     wasSunk = checkIfSunk(board, y, x);
                     if (wasSunk){
                         sendMsg(ws, "Sunk a ship!");
+                        sendMsg(opposingPlayer, "Opponent sunk one of your ships!");
+                        // if no ships left, game is over.
+                        if (!shipsLeft(board)){
+                            sendMsg(ws, "You Win!");
+                            sendMsg(opposingPlayer, "You Lose!");
+                            connections.set(ws, ["init", -1, undefined]);
+                            connections.set(opposingPlayer, ["init", -1, undefined]);
+                        }
                     }
-                    // if ship sunk, broadcast that it was
-                    // if no ships left, game is over.
                     break;
                 }
                 sendMsg(ws, "miss");
@@ -271,7 +285,7 @@ wss.on('connection', (ws) => {
             console.log("closing lobby", lobby);
             games[lobby].forEach(function each(client) {
                 if (client != ws) {
-                    connections.set(client, ["init", -1]);
+                    connections.set(client, ["init", -1, undefined]);
                     sendMsg(client, "disconnected return to menu");
                     delete games[lobby];
                 }
