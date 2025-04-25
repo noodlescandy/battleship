@@ -14,6 +14,28 @@
         <button id="joinGame">Join Game</button>
     </div>
     <div id="messages"></div>
+    <div id="shipPlacement">
+        <label for="shipSelect">Select Ship:</label>
+        <select id="shipSelect">
+            <option value="5">Carrier (5)</option>
+            <option value="4">Battleship (4)</option>
+            <option value="3">Cruiser (3)</option>
+            <option value="3">Submarine (3)</option>
+            <option value="2">Destroyer (2)</option>
+        </select>
+        <label for="rowInput">Row:</label>
+        <input type="number" id="rowInput" min="0" max="9" placeholder="0-9">
+        <label for="colInput">Column:</label>
+        <input type="number" id="colInput" min="0" max="9" placeholder="0-9">
+        <label for="orientationSelect">Orientation:</label>
+        <select id="orientationSelect">
+            <option value="horizontal">Horizontal</option>
+            <option value="vertical">Vertical</option>
+        </select>
+        <button id="placeShipButton">Place Ship</button>
+    </div>
+    <div id="grid"></div>
+    <button id="submitBoard">Submit Board</button>
     <script src="client.js"></script>
 </body>
 </html>

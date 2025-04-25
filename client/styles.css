@@ -5,6 +5,10 @@ body {
     padding: 0;
 }
 
+h1 {
+    margin-top: 20px;
+}
+
 #menu {
     margin-top: 20px;
 }
@@ -12,4 +16,44 @@ body {
 #messages {
     margin-top: 20px;
     color: red;
+}
+
+#shipPlacement {
+    margin: 20px;
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    align-items: center;
+}
+
+#shipPlacement label {
+    font-weight: bold;
+}
+
+#shipPlacement input,
+#shipPlacement select,
+#shipPlacement button {
+    padding: 5px;
+    font-size: 14px;
+}
+
+#grid {
+    display: grid;
+    grid-template-columns: repeat(10, 30px);
+    grid-template-rows: repeat(10, 30px);
+    gap: 2px;
+    margin: 20px auto;
+    width: max-content;
+}
+
+#grid div {
+    width: 30px;
+    height: 30px;
+    background-color: lightblue;
+    border: 1px solid #000;
+    cursor: pointer;
+}
+
+#grid div.ship {
+    background-color: navy;
 }
