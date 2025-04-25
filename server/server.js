@@ -120,10 +120,7 @@ wss.on('connection', (ws) => {
                 break;
             case 'turn':
                 // on turn, receive message from client with coords they want to hit
-                // format 0-9 twice as y x (ie: 3 6, 8 4, 9 9, 0 0) -- coordinates to array arr[y][x]
                 // validate coords (is two numbers 0-9) and seperate into two
-                //coords, y, x = -1;
-                coords = undefined;
                 y = -1;
                 x = -1;
                 try {
@@ -137,10 +134,18 @@ wss.on('connection', (ws) => {
                     sendMsg(ws, "Error: " + error + ".  Format: 0-9 0-9 for y, x on board.");
                     break;
                 }
-                sendMsg(ws, "valid shot of " + y + " " + x);
+                // if already hit
+                // changing board here changes it there bc it's a reference to the object.
+                board = connections.get(ws)[2];
+                if(board[y][x] > 1){
+                    sendMsg(ws, "Error: already shot here!");
+                    break;
+                }
+                board[y][x] += 2;
+                sendMsg(ws, "At " + y + ", " + x + " now " + board[y][x]);
                 // if hit, return hit, if miss return miss (send to both)
                 // update board serverside
-                // set turn to other player, set this player to wait.
+                // set turn to other player, send them their board, set this player to wait.
                 break;
             case 'wait':
                 sendMsg(ws, "Please wait for other client.");
