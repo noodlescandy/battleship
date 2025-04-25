@@ -142,10 +142,16 @@ wss.on('connection', (ws) => {
                     break;
                 }
                 board[y][x] += 2;
-                sendMsg(ws, "At " + y + ", " + x + " now " + board[y][x]);
-                // if hit, return hit, if miss return miss (send to both)
-                // update board serverside
-                // set turn to other player, send them their board, set this player to wait.
+                if (board[y][x] === 3){
+                    sendMsg(ws, "hit (go again)");
+                    // check if ship was sunk.
+                    // if ship sunk, broadcast that it was
+                    break;
+                }
+                sendMsg(ws, "miss");
+                // set turn to other player
+                // send them their board since it's changed
+                // set ws to wait state
                 break;
             case 'wait':
                 sendMsg(ws, "Please wait for other client.");
