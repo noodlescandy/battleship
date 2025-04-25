@@ -118,7 +118,30 @@ wss.on('connection', (ws) => {
                     }
                 });
                 break;
-            // TODO - other states -- turn
+            case 'turn':
+                // on turn, receive message from client with coords they want to hit
+                // format 0-9 twice as y x (ie: 3 6, 8 4, 9 9, 0 0) -- coordinates to array arr[y][x]
+                // validate coords (is two numbers 0-9) and seperate into two
+                //coords, y, x = -1;
+                coords = undefined;
+                y = -1;
+                x = -1;
+                try {
+                    coords = messageData.split(" ");
+                    if(coords.length != 2) throw "invalid coords";
+                    y = parseInt(coords[0], 10);
+                    if(Number.isNaN(y) || y < 0 || y > 9) throw "invalid y";
+                    x = parseInt(coords[1], 10);
+                    if(Number.isNaN(x) || x < 0 || x > 9) throw "invalid x";
+                } catch (error) {
+                    sendMsg(ws, "Error: " + error + ".  Format: 0-9 0-9 for y, x on board.");
+                    break;
+                }
+                sendMsg(ws, "valid shot of " + y + " " + x);
+                // if hit, return hit, if miss return miss (send to both)
+                // update board serverside
+                // set turn to other player, set this player to wait.
+                break;
             case 'wait':
                 sendMsg(ws, "Please wait for other client.");
                 break;
