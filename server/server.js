@@ -92,6 +92,36 @@ function validateBoard(board){
     return "ok";
 }
 
+// ships will not have any adjacent ships, so are either straight vert or horizontal. Ship is sunk if it has no 1s left on it
+function checkIfSunk(board, y, x){
+    // try going left, then right
+    y = Number.parseInt(y);
+    x = Number.parseInt(x);
+    for(var i = 1; i > -2; i -= 2) {
+        currentY = y;
+        currentX = x;
+        vertTile = board[currentY][x];
+        horiTile = board[y][currentX];
+        while (vertTile == 3 || horiTile == 3){
+            if (vertTile == 3){
+                currentY += i;
+                vertTile = currentY > 9 || currentY < 0 ? 0 : board[currentY][x];
+            }
+            if (horiTile == 3){
+                currentX += i;
+                horiTile = currentX > 9 || currentX < 0 ?0 : board[y][currentX];
+            }
+        }
+        if (vertTile == 1){
+            return false;
+        }
+        if (horiTile == 1){
+            return false;
+        }
+    }
+    return true; // no unhit tiles, only ocean or hit ocean surrounding hit tiles
+}
+
 // sends the text to the websocket if it is open
 function sendMsg(ws, text){
     if (ws.readyState = WebSocket.OPEN){
@@ -210,8 +240,10 @@ wss.on('connection', (ws) => {
                 if (board[y][x] === 3){
                     sendMsg(ws, "hit (go again)");
                     // check if ship was sunk.
-                    // ships will not have any adjacent ships, so are either straight vert or horizontal. The
-
+                    wasSunk = checkIfSunk(board, y, x);
+                    if (wasSunk){
+                        sendMsg(ws, "Sunk a ship!");
+                    }
                     // if ship sunk, broadcast that it was
                     // if no ships left, game is over.
                     break;
