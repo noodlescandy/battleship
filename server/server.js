@@ -16,20 +16,118 @@ function validateBoard(board){
     }
     // validate number of ship tiles on board (5,4,3,3,2=17)
     countShipTiles = 0;
+    foundCarrier = false;
     for(var i = 0; i < board.length; i++){
         if (board[i].length != 10){
             return "bad row length " + board[i].length;
         }
+        maxContinuousShipTiles = 0;
+        continuousShipTiles = 0;
         for(var j = 0; j < board[i].length; j++){
             if(board[i][j]){
                 countShipTiles++;
+                continuousShipTiles++;
+                adjacents = 0;
+                if (i != 0){
+                    if (board[i-1][j] === 1) adjacents++;
+                }
+                if (j != 0){
+                    if (board[i][j-1] === 1) adjacents++;
+                }
+                if (i < 9){
+                    if (board[i+1][j] === 1) adjacents++;
+                }
+                if (j < 9){
+                    if (board[i][j+1] === 1) adjacents++;
+                }
+                if (adjacents > 2){
+                    return "ships cannot be adjacent";
+                }
+                if (adjacents === 0){
+                    return "invalid ship detected. Ships cannot be size 1";
+                }
             }
+            else{
+                if(maxContinuousShipTiles < continuousShipTiles) maxContinuousShipTiles = continuousShipTiles;
+                continuousShipTiles = 0;
+            }
+        }
+        if(maxContinuousShipTiles < continuousShipTiles) maxContinuousShipTiles = continuousShipTiles;
+        if (maxContinuousShipTiles > 5 || (foundCarrier && maxContinuousShipTiles === 5)){
+            return "ships cannot be adjacent horizontally.";
+        }
+        if (maxContinuousShipTiles === 5){
+            foundCarrier = true;
         }
     }
     if(countShipTiles != 17){
         return "bad ship count " + countShipTiles;
     }
+    // Check corners for adjacency
+    if ((board[0][0] === 1 && board[0][1] === 1 && board[1][0] === 1) || (board[9][9] === 1 & board[8][9] === 1 && board[9][8] === 1)){
+        return "ships cannot be adjacent";
+    }
+    // check up/down for continuous tiles
+    // has to happen seperately so it doesn't miss any while counting horizontals.
+    for(var i = 0; i < board.length; i++){
+        maxContinuousShipTiles = 0;
+        continuousShipTiles = 0;
+        for(var j = 0; j < board.length; j++){
+            if (board[j][i] === 1){
+                continuousShipTiles++;
+            }
+            else{
+                if(maxContinuousShipTiles < continuousShipTiles) maxContinuousShipTiles = continuousShipTiles;
+                continuousShipTiles = 0;
+            }
+        }
+        if(maxContinuousShipTiles < continuousShipTiles) maxContinuousShipTiles = continuousShipTiles;
+        if (maxContinuousShipTiles > 5 || (foundCarrier && maxContinuousShipTiles === 5)){
+            return "ships cannot be adjacent vertically.";
+        }
+        if (maxContinuousShipTiles === 5){
+            foundCarrier = true;
+        }
+    }
     return "ok";
+}
+
+// ships will not have any adjacent ships, so are either straight vert or horizontal. Ship is sunk if it has no 1s left on it
+function checkIfSunk(board, y, x){
+    // try going left, then right
+    y = Number.parseInt(y);
+    x = Number.parseInt(x);
+    for(var i = 1; i > -2; i -= 2) {
+        currentY = y;
+        currentX = x;
+        vertTile = board[currentY][x];
+        horiTile = board[y][currentX];
+        while (vertTile == 3 || horiTile == 3){
+            if (vertTile == 3){
+                currentY += i;
+                vertTile = currentY > 9 || currentY < 0 ? 0 : board[currentY][x];
+            }
+            if (horiTile == 3){
+                currentX += i;
+                horiTile = currentX > 9 || currentX < 0 ?0 : board[y][currentX];
+            }
+        }
+        if (vertTile == 1){
+            return false;
+        }
+        if (horiTile == 1){
+            return false;
+        }
+    }
+    return true; // no unhit tiles, only ocean or hit ocean surrounding hit tiles
+}
+
+// checks the board for any 1s, which indicate an unhit ship tile
+function shipsLeft(board){
+    for (var i = 0; i < board.length; i++){
+        if (board[i].includes(1)) return true;
+    }
+    return false;
 }
 
 // sends the text to the websocket if it is open
@@ -118,7 +216,59 @@ wss.on('connection', (ws) => {
                     }
                 });
                 break;
-            // TODO - other states -- turn
+            case 'turn':
+                // on turn, receive message from client with coords they want to hit
+                // validate coords (is two numbers 0-9) and seperate into two
+                y = -1;
+                x = -1;
+                try {
+                    coords = messageData.split(" ");
+                    if(coords.length != 2) throw "invalid coords";
+                    y = parseInt(coords[0], 10);
+                    if(Number.isNaN(y) || y < 0 || y > 9) throw "invalid y";
+                    x = parseInt(coords[1], 10);
+                    if(Number.isNaN(x) || x < 0 || x > 9) throw "invalid x";
+                } catch (error) {
+                    sendMsg(ws, "Error: " + error + ".  Format: 0-9 0-9 for y, x on board.");
+                    break;
+                }
+                opposingPlayer = undefined;
+                games[code].forEach(function each(client){
+                    if (ws != client){
+                        opposingPlayer = client;
+                    }
+                });
+                // changing board here should change it there bc it's a reference to the object.
+                board = connections.get(opposingPlayer)[2];
+                if(board[y][x] > 1){
+                    sendMsg(ws, "Error: already shot here!");
+                    break;
+                }
+                board[y][x] += 2;
+                if (board[y][x] === 3){
+                    sendMsg(ws, "hit (go again)");
+                    // check if ship was sunk.
+                    wasSunk = checkIfSunk(board, y, x);
+                    if (wasSunk){
+                        sendMsg(ws, "Sunk a ship!");
+                        sendMsg(opposingPlayer, "Opponent sunk one of your ships!");
+                        // if no ships left, game is over.
+                        if (!shipsLeft(board)){
+                            sendMsg(ws, "You Win!");
+                            sendMsg(opposingPlayer, "You Lose!");
+                            connections.set(ws, ["init", -1, undefined]);
+                            connections.set(opposingPlayer, ["init", -1, undefined]);
+                        }
+                    }
+                    break;
+                }
+                sendMsg(ws, "miss");
+                sendMsg(ws, "waiting for other player");
+                connections.set(ws, ['wait', connections.get(ws)[1], connections.get(ws)[2]]);
+                sendMsg(opposingPlayer, board);
+                sendMsg(opposingPlayer, "your turn");
+                connections.set(opposingPlayer, ['turn', connections.get(opposingPlayer)[1], connections.get(opposingPlayer)[2]]);
+                break;
             case 'wait':
                 sendMsg(ws, "Please wait for other client.");
                 break;
@@ -135,7 +285,7 @@ wss.on('connection', (ws) => {
             console.log("closing lobby", lobby);
             games[lobby].forEach(function each(client) {
                 if (client != ws) {
-                    connections.set(client, ["init", -1]);
+                    connections.set(client, ["init", -1, undefined]);
                     sendMsg(client, "disconnected return to menu");
                     delete games[lobby];
                 }
