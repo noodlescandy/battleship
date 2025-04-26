@@ -130,10 +130,12 @@ function shipsLeft(board){
     return false;
 }
 
-// sends the text to the websocket if it is open
-function sendMsg(ws, text){
-    if (ws.readyState === WebSocket.OPEN){
-        ws.send(JSON.stringify(text));
+function sendMsg(ws, text) {
+    if (ws.readyState === WebSocket.OPEN) {
+        // If text is already an object, stringify it once
+        // If it's a string, send it directly
+        const message = typeof text === 'object' ? JSON.stringify(text) : text;
+        ws.send(message);
     }
 }
 

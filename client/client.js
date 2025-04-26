@@ -24,74 +24,73 @@ ws.onmessage = (event) => {
     console.log('Raw message received:', event.data);
 
     try {
-        const messageData = JSON.parse(event.data);
-        console.log('Successfully parsed JSON:', messageData);
-
-        // Handle "updateOwnGrid" messages
-        if (messageData && typeof messageData === 'object' && messageData.type === "updateOwnGrid") {
-            handleGridUpdate(messageData.data); // Update personal grid
-            return; // Prevent further processing
-        }
-
-        // Handle "sunkShip" messages
-        if (messageData && typeof messageData === 'object' && messageData.type === "sunkShip") {
-            handleSunkShip(messageData.data); // Update all cells of the sunk ship
-            return; // Prevent further processing
-        }
-
-        // Handle updates for the opponent's grid (already implemented)
-        if (Array.isArray(messageData)) {
-            messageData.forEach((row, i) => {
-                row.forEach((cell, j) => {
-                    const targetCell = opponentGrid.querySelector(`[data-row="${i}"][data-col="${j}"]`);
-                    if (targetCell) {
-                        if (cell === 3) {
-                            targetCell.classList.remove('guessing');
-                            targetCell.classList.add('hit');
-                        }
-                        if (cell === 2) {
-                            targetCell.classList.remove('guessing');
-                            targetCell.classList.add('miss');
-                        }
-                    }
-                });
-            });
-            return; // Prevent further processing
-        }
-
-        // If the message is not an object or array, process it as a string
+        // First, try to parse the message as JSON
+        let messageData = event.data;
+        
+        // If the message is a string, try to parse it as JSON
         if (typeof messageData === 'string') {
-            console.log('Processing as string message:', messageData);
+            try {
+                messageData = JSON.parse(messageData);
+                console.log('Successfully parsed JSON:', messageData);
+            } catch (parseError) {
+                // If parsing fails, it's probably just a plain string message
+                console.log('Not JSON, treating as plain text:', messageData);
+            }
+        }
+
+        // Now handle the message based on its content
+        if (typeof messageData === 'object' && messageData !== null) {
+            // Handle object messages (parsed JSON)
+            if (messageData.type === "updateOwnGrid") {
+                console.log('Handling grid update:', messageData.data);
+                handleGridUpdate(messageData.data);
+                return;
+            }
+            // Handle other object messages if needed
+        } else if (typeof messageData === 'string') {
+            // Handle plain text messages
             processStringMessage(messageData);
             return;
         }
-
-        console.log('Unhandled JSON object:', messageData);
-
     } catch (e) {
-        // If parsing fails, log the error and ignore the message
-        console.log('Error parsing message as JSON:', e);
+        console.error('Error processing message:', e);
+        // Fallback: try to process as string
+        processStringMessage(event.data);
     }
 };
 
-function handleGridUpdate(data) {
-    const { row, col, status } = data;
-    console.log(`Updating your grid at ${row},${col} to ${status}`);
 
-    const targetCell = grid.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+
+function handleGridUpdate(data) {
+    const ownGrid = document.getElementById('grid');
+    const { row, col, status } = data;
+    console.log(`handleGridUpdate called with data:`, data);
+    console.log(`Updating your grid at row ${row}, col ${col} to status ${status}`);
+
+    // Find the target cell in the player's grid
+    const targetCell = ownGrid.querySelector(`[data-row="${row}"][data-col="${col}"]`);
+    console.log(`Target cell for row ${row}, col ${col}:`, targetCell);
+
     if (targetCell) {
+        console.log(`Found cell at row ${row}, col ${col}. Updating status to ${status}.`);
+
         // Remove old hit/miss classes (if any), to avoid stacking weird states
         targetCell.classList.remove('hit', 'miss');
 
+        // Add the appropriate class based on the status
         if (status === "hit") {
             targetCell.classList.add('hit');
+            console.log(`Added 'hit' class to cell at row ${row}, col ${col}.`);
             messagesDiv.textContent = "Your ship was hit!";
         } else if (status === "miss") {
             targetCell.classList.add('miss');
+            console.log(`Added 'miss' class to cell at row ${row}, col ${col}.`);
             messagesDiv.textContent = "They missed your ship!";
+        } else {
+            console.error(`Unknown status: ${status}`);
         }
     } else {
-        console.error(`Cell not found at ${row},${col}`);
+        console.error(`Cell not found at row ${row}, col ${col}. Ensure the grid is properly initialized.`);
     }
 }
 
@@ -107,6 +106,7 @@ function handleSunkShip(cells) {
 
     messagesDiv.textContent = "One of your ships was sunk!";
 }
+
 
 function processStringMessage(message) {
     console.log('Processing string message:', message);
@@ -133,6 +133,7 @@ function processStringMessage(message) {
             }
         }
         messagesDiv.textContent = "You hit a ship!";
+
     } else if (message === "hit (go again)") {
         messagesDiv.textContent = "You hit a ship! Go again.";
     } else if (message.startsWith("miss ")) {
@@ -291,6 +292,7 @@ for (let i = 0; i < 10; i++) {
         grid.appendChild(cell);
     }
 }
+console.log(`Player grid initialized with ${grid.children.length} cells.`);
 
 for (let i = 0; i < 10; i++) {
     for (let j = 0; j < 10; j++) {
