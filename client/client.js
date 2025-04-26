@@ -22,11 +22,22 @@ ws.onopen = () => {
 
 ws.onmessage = (event) => {
     console.log('Raw message received:', event.data);
+    const rawMessage = event.data; // Store the original raw data
+
+    // --- START CHANGE ---
+    // 1. Check if it's likely the game code *first*
+    //    (Must be a string, and parseable as a number)
+    if (typeof rawMessage === 'string' && !isNaN(rawMessage) && rawMessage.trim() !== '') {
+         console.log('Detected numeric string (likely game code):', rawMessage);
+         // Directly call the function that handles plain string messages like the code
+         processStringMessage(rawMessage);
+         return; // Exit early, we've handled this message
+    }
 
     try {
         // First, try to parse the message as JSON
         let messageData = event.data;
-        
+
         // If the message is a string, try to parse it as JSON
         if (typeof messageData === 'string') {
             try {
@@ -40,6 +51,7 @@ ws.onmessage = (event) => {
 
         // Now handle the message based on its content
         if (typeof messageData === 'object' && messageData !== null) {
+            
             // Handle object messages (parsed JSON)
             if (messageData.type === "updateOwnGrid") {
                 console.log('Handling grid update:', messageData.data);
@@ -58,8 +70,6 @@ ws.onmessage = (event) => {
         processStringMessage(event.data);
     }
 };
-
-
 
 function handleGridUpdate(data) {
     const ownGrid = document.getElementById('grid');
@@ -110,6 +120,14 @@ function handleSunkShip(cells) {
 
 function processStringMessage(message) {
     console.log('Processing string message:', message);
+
+     // Check if the message is a numeric game code
+     if (!isNaN(message) && message.trim() !== '') {
+        // This is likely a game code
+        const gameCodeDisplay = document.getElementById('gameCode');
+        gameCodeDisplay.textContent = message;
+        return;
+    }
 
     if (message === "game start") {
         messagesDiv.textContent = "Game has started!";
