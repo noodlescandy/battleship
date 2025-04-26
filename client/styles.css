@@ -37,23 +37,71 @@ h1 {
     font-size: 14px;
 }
 
-#grid {
-    display: grid;
-    grid-template-columns: repeat(10, 30px);
-    grid-template-rows: repeat(10, 30px);
-    gap: 2px;
+#gridsContainer {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
     margin: 20px auto;
+}
+
+#grid, #opponentGrid {
+    display: grid;
+    grid-template-columns: repeat(10, 60px); /* Increased from 30px to 40px */
+    grid-template-rows: repeat(10, 60px);   /* Increased from 30px to 40px */
+    gap: 2px;
     width: max-content;
 }
 
-#grid div {
-    width: 30px;
-    height: 30px;
+#grid div, #opponentGrid div {
+    width: 60px; /* Increased from 30px to 40px */
+    height: 60px; /* Increased from 30px to 40px */
     background-color: lightblue;
     border: 1px solid #000;
     cursor: pointer;
 }
 
+/* Your board */
 #grid div.ship {
     background-color: navy;
+}
+
+#grid div.preview {
+    background-color: lightgreen;
+}
+
+#grid div.hit {
+    background-color: red;
+}
+
+#grid div.miss {
+    background-color: white;
+}
+
+/* Opponent board */
+#opponentGrid div {
+    background-color: lightgray;
+}
+
+#opponentGrid div.hit {
+    background-color: red;
+}
+
+#opponentGrid div.miss {
+    background-color: white;
+}
+
+.guessing {
+    background-color: gray;
+}
+
+body {
+    background-color: #fdf5e6; /* Old Lace */
+}
+
+#grid div.ship.hit {
+    background-color: red;
+}
+
+#grid div.ship.miss {
+    background-color: white;
 }
