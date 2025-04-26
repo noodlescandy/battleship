@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battleship</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Battleship</h1>
+    <div id="menu">
+        <button id="startGame">Start Game</button>
+        <input type="text" id="joinCode" placeholder="Enter Game Code">
+        <button id="joinGame">Join Game</button>
+    </div>
+    <div id="messages"></div>
+    <div>Game Code: <span id="gameCode" style="font-weight: bold; font-size: larger;"></span></div>
+    <div id="shipPlacement">
+        <label for="shipSelect">Select Ship:</label>
+        <select id="shipSelect">
+            <option value="5">Carrier (5)</option>
+            <option value="4">Battleship (4)</option>
+            <option value="3">Cruiser (3)</option>
+            <option value="3">Submarine (3)</option>
+            <option value="2">Destroyer (2)</option>
+        </select>
+        <label for="rowInput">Row:</label>
+        <input type="number" id="rowInput" min="0" max="9" placeholder="0-9">
+        <label for="colInput">Column:</label>
+        <input type="number" id="colInput" min="0" max="9" placeholder="0-9">
+        <label for="orientationSelect">Orientation:</label>
+        <select id="orientationSelect">
+            <option value="horizontal">Horizontal</option>
+            <option value="vertical">Vertical</option>
+        </select>
+        <button id="placeShipButton">Place Ship</button>
+    </div>
+    <div id="gridsContainer">
+        <div id="grid"></div>
+        <div id="opponentGrid"></div>
+    </div>
+    <button id="submitBoard">Submit Board</button>
+    <script src="client.js"></script>
+</body>
+</html>

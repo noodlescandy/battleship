@@ -130,10 +130,12 @@ function shipsLeft(board){
     return false;
 }
 
-// sends the text to the websocket if it is open
-function sendMsg(ws, text){
-    if (ws.readyState = WebSocket.OPEN){
-        ws.send(JSON.stringify(text));
+function sendMsg(ws, text) {
+    if (ws.readyState === WebSocket.OPEN) {
+        // If text is already an object, stringify it once
+        // If it's a string, send it directly
+        const message = typeof text === 'object' ? JSON.stringify(text) : text;
+        ws.send(message);
     }
 }
 
@@ -216,68 +218,87 @@ wss.on('connection', (ws) => {
                     }
                 });
                 break;
-            case 'turn':
-                // on turn, receive message from client with coords they want to hit
-                // validate coords (is two numbers 0-9) and seperate into two
-                y = -1;
-                x = -1;
-                try {
-                    coords = messageData.split(" ");
-                    if(coords.length != 2) throw "invalid coords";
-                    y = parseInt(coords[0], 10);
-                    if(Number.isNaN(y) || y < 0 || y > 9) throw "invalid y";
-                    x = parseInt(coords[1], 10);
-                    if(Number.isNaN(x) || x < 0 || x > 9) throw "invalid x";
-                } catch (error) {
-                    sendMsg(ws, "Error: " + error + ".  Format: 0-9 0-9 for y, x on board.");
-                    break;
-                }
-                opposingPlayer = undefined;
-                games[code].forEach(function each(client){
-                    if (ws != client){
-                        opposingPlayer = client;
+                case 'turn':
+                    // on turn, receive message from client with coords they want to hit
+                    y = -1;
+                    x = -1;
+                    try {
+                        coords = messageData.split(" ");
+                        if (coords.length != 2) throw "invalid coords";
+                        y = parseInt(coords[0], 10);
+                        if (Number.isNaN(y) || y < 0 || y > 9) throw "invalid y";
+                        x = parseInt(coords[1], 10);
+                        if (Number.isNaN(x) || x < 0 || x > 9) throw "invalid x";
+                    } catch (error) {
+                        sendMsg(ws, "Error: " + error + ". Format: 0-9 0-9 for y, x on board.");
+                        break;
                     }
-                });
-                // changing board here should change it there bc it's a reference to the object.
-                board = connections.get(opposingPlayer)[2];
-                if(board[y][x] > 1){
-                    sendMsg(ws, "Error: already shot here!");
-                    break;
-                }
-                board[y][x] += 2;
-                if (board[y][x] === 3){
-                    sendMsg(ws, "hit (go again)");
-                    // check if ship was sunk.
-                    wasSunk = checkIfSunk(board, y, x);
-                    if (wasSunk){
-                        sendMsg(ws, "Sunk a ship!");
-                        sendMsg(opposingPlayer, "Opponent sunk one of your ships!");
-                        // if no ships left, game is over.
-                        if (!shipsLeft(board)){
-                            sendMsg(ws, "You Win!");
-                            sendMsg(opposingPlayer, "You Lose!");
-                            connections.set(ws, ["init", -1, undefined]);
-                            connections.set(opposingPlayer, ["init", -1, undefined]);
+    
+                    let opposingPlayer = undefined;
+                    games[connections.get(ws)[1]].forEach(function each(client) {
+                        if (ws != client) {
+                            opposingPlayer = client;
                         }
+                    });
+    
+                    let board = connections.get(opposingPlayer)[2];
+                    if (board[y][x] > 1) {
+                        sendMsg(ws, "Error: already shot here!");
+                        break;
                     }
+    
+                    board[y][x] += 2;
+                    if (board[y][x] === 3) {
+                        sendMsg(ws, `hit ${y} ${x}`);
+                        sendMsg(ws, "hit (go again)");
+    
+                        // Notify the opponent about the hit on their grid
+                        sendMsg(opposingPlayer, JSON.stringify({
+                            type: "updateOwnGrid",
+                            data: { row: y, col: x, status: "hit" }
+                        }));
+    
+                        // Check if the ship was sunk
+                        const wasSunk = checkIfSunk(board, y, x);
+                        if (wasSunk) {
+                            sendMsg(ws, "Sunk a ship!");
+                            sendMsg(opposingPlayer, "Opponent sunk one of your ships!");
+    
+                            // If no ships left, game is over
+                            if (!shipsLeft(board)) {
+                                sendMsg(ws, "You Win!");
+                                sendMsg(opposingPlayer, "You Lose!");
+                                connections.set(ws, ["init", -1, undefined]);
+                                connections.set(opposingPlayer, ["init", -1, undefined]);
+                            }
+                        }
+                        break;
+                    }
+    
+                    sendMsg(ws, `miss ${y} ${x}`);
+                    sendMsg(ws, "miss");
+    
+                    // Notify the opponent about the miss on their grid
+                    sendMsg(opposingPlayer, JSON.stringify({
+                        type: "updateOwnGrid",
+                        data: { row: y, col: x, status: "miss" }
+                    }));
+    
+                    sendMsg(ws, "waiting for other player");
+                    connections.set(ws, ['wait', connections.get(ws)[1], connections.get(ws)[2]]);
+                    sendMsg(opposingPlayer, "your turn");
+                    connections.set(opposingPlayer, ['turn', connections.get(opposingPlayer)[1], connections.get(opposingPlayer)[2]]);
                     break;
-                }
-                sendMsg(ws, "miss");
-                sendMsg(ws, "waiting for other player");
-                connections.set(ws, ['wait', connections.get(ws)[1], connections.get(ws)[2]]);
-                sendMsg(opposingPlayer, board);
-                sendMsg(opposingPlayer, "your turn");
-                connections.set(opposingPlayer, ['turn', connections.get(opposingPlayer)[1], connections.get(opposingPlayer)[2]]);
-                break;
-            case 'wait':
-                sendMsg(ws, "Please wait for other client.");
-                break;
-            default:
-                // unknown state/ not implemented
-                sendMsg(ws, "Error: Message not recognized/implemented. Try again later.");
-                break;
-        }
-    });
+    
+                case 'wait':
+                    sendMsg(ws, "Please wait for other client.");
+                    break;
+    
+                default:
+                    sendMsg(ws, "Error: Message not recognized/implemented. Try again later.");
+                    break;
+            }
+        });
 
     ws.on('close', () => {
         if(connections.get(ws)[1] != -1){
@@ -297,3 +318,4 @@ wss.on('connection', (ws) => {
 });
 
 console.log('WebSocket server running on port', portNo);
+
